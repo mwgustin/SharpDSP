@@ -8,9 +8,6 @@ public class BiquadFilter
     float target_b0, target_b1, target_b2, target_a1, target_a2; 
     // step values for each coefficient to incrementally move from current to target over the smoothing period
     float step_b0 = 0, step_b1 = 0, step_b2 = 0, step_a1 = 0, step_a2 = 0; 
-
-    // flag to indicate if target coefficients have changed and need smoothing
-    bool targetChanged = false; 
     
     // Adjust this for faster/slower smoothing 
     const float smoothingTimeSeconds = 0.02f; 
@@ -47,12 +44,25 @@ public class BiquadFilter
             // if we have pending coefficient changes, incrementally update them towards the target values
             if(samplesRemaining > 0)
             {
-                b0 += step_b0;
-                b1 += step_b1;
-                b2 += step_b2;
-                a1 += step_a1;
-                a2 += step_a2;
                 samplesRemaining--;
+                if(samplesRemaining == 0)
+                {
+                    // Ensure we end up exactly at the target coefficients after the final step
+                    b0 = target_b0;
+                    b1 = target_b1;
+                    b2 = target_b2;
+                    a1 = target_a1;
+                    a2 = target_a2;
+                }
+                else
+                {
+                    // Incrementally update coefficients towards their targets
+                    b0 += step_b0;
+                    b1 += step_b1;
+                    b2 += step_b2;
+                    a1 += step_a1;
+                    a2 += step_a2;
+                }
             }
 
             //main biquad calculation: y[n] = b0*x[n] + b1*x[n-1] + b2*x[n-2] - a1*y[n-1] - a2*y[n-2]
@@ -177,9 +187,9 @@ public class BiquadFilter
         target_b2 = b2_raw / a0_raw;
         target_a1 = a1_raw / a0_raw;
         target_a2 = a2_raw / a0_raw; 
-        
-        samplesRemaining = (int)samplesToTarget;
+
         SetSteps();
+        samplesRemaining = (int)samplesToTarget;
 
     }
     // This method calculates the step values for each coefficient to smoothly transition from the current coefficients to the target coefficients over the specified number of samples (smoothing period). It is called when the target coefficients are updated and the targetChanged flag is set.
