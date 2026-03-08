@@ -12,9 +12,8 @@ public class BiquadFilter
     // Adjust this for faster/slower smoothing 
     const float smoothingTimeSeconds = 0.02f; 
     // Assuming a sample rate of 44.1kHz
-    const int sampleRate = 44100; 
     // Calculate the number of samples over which to smooth the transition to the new coefficients based on the desired smoothing time and sample rate
-    const float samplesToTarget = smoothingTimeSeconds * sampleRate;
+    const float samplesToTarget = smoothingTimeSeconds * Constants.SampleRate;
 
     // Counter for smoothing samples
     public int samplesRemaining = 0; 
@@ -45,7 +44,7 @@ public class BiquadFilter
             if(samplesRemaining > 0)
             {
                 samplesRemaining--;
-                
+
                 if(samplesRemaining == 0)
                 {
                     // Ensure we end up exactly at the target coefficients after the final step
@@ -92,7 +91,7 @@ public class BiquadFilter
         ClampFrequency(ref frequency);
 
         // 1. Calculate intermediate variables
-        float omega = (float)(2.0 * Math.PI * frequency / sampleRate);
+        float omega = (float)(2.0 * Math.PI * frequency / Constants.SampleRate);
         float sn = (float)Math.Sin(omega);
         float cs = (float)Math.Cos(omega);
         float alpha = sn / (2.0f * q);
@@ -117,7 +116,7 @@ public class BiquadFilter
         // $\omega_0 = 2\pi \frac{f_c}{f_s}$
         // $\cos\omega_0 = \cos(\omega_0)$
         // $\alpha = \frac{\sin(\omega_0)}{2Q}$
-        float omega = (float)(2.0 * Math.PI * frequency / sampleRate);
+        float omega = (float)(2.0 * Math.PI * frequency / Constants.SampleRate);
         float sn = (float)Math.Sin(omega);
         float cs = (float)Math.Cos(omega);
         float alpha = sn / (2.0f * q);
@@ -152,7 +151,7 @@ public class BiquadFilter
         // $\omega_0 = 2\pi \frac{f_c}{f_s}$
         // $\alpha = \frac{\sin(\omega_0)}{2Q}$
         float A = (float)Math.Pow(10, gainDb / 40.0);
-        float omega = (float)(2.0 * Math.PI * (frequency / sampleRate));
+        float omega = (float)(2.0 * Math.PI * (frequency / Constants.SampleRate));
         float alpha = (float)(Math.Sin(omega) / (2.0 * q));
         float cs = (float)Math.Cos(omega);
 
@@ -177,7 +176,7 @@ public class BiquadFilter
     private void ClampFrequency(ref float frequency)
     {
         frequency = Math.Max(20, frequency); // Clamp to 20Hz minimum
-        frequency = Math.Min(frequency, sampleRate / 2); // Clamp to Nyquist frequency
+        frequency = Math.Min(frequency, Constants.SampleRate / 2); // Clamp to Nyquist frequency
     }
 
     // This allows our Process() formula to be: y = b0*x + ... - a1*y1 - a2*y2
