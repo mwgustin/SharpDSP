@@ -41,19 +41,10 @@ public class BiquadFilter
 
     public void Process(float[] buffer)
     {
-        if(targetChanged)
-        {
-            samplesRemaining = (int)samplesToTarget;
-            targetChanged = false;
-            step_b0 = (target_b0 - b0) / samplesToTarget;
-            step_b1 = (target_b1 - b1) / samplesToTarget;
-            step_b2 = (target_b2 - b2) / samplesToTarget;
-            step_a1 = (target_a1 - a1) / samplesToTarget;
-            step_a2 = (target_a2 - a2) / samplesToTarget;
-        }
-
+        // MAIN HOT PATH: Process each sample in the buffer
         for(int i = 0; i < buffer.Length; i++)
         {
+            // if we have pending coefficient changes, incrementally update them towards the target values
             if(samplesRemaining > 0)
             {
                 b0 += step_b0;
@@ -64,9 +55,11 @@ public class BiquadFilter
                 samplesRemaining--;
             }
 
+            //main biquad calculation: y[n] = b0*x[n] + b1*x[n-1] + b2*x[n-2] - a1*y[n-1] - a2*y[n-2]
             float x0 = buffer[i];
             float y0 = (b0*x0) + (b1*x1) + (b2*x2) - (a1*y1) - (a2*y2);
 
+            //transition state for next sample
             x2 = x1;
             x1 = x0;
             y2 = y1;
@@ -75,15 +68,17 @@ public class BiquadFilter
             // Add a denormal guard before writing back to the buffer to prevent very small values from causing CPU performance issues
             if (Math.Abs(y0) < 1e-15f) y0 = 0.0f;
 
+            // write the processed sample back to the buffer
             buffer[i] = y0;
         }
 
     }
 
+
+    // configure the filter as a low-pass with the given cutoff frequency and Q factor
     public void UpdateLowPass(float frequency, float q)
     {
-        frequency = Math.Max(20, frequency); // Clamp to 20Hz minimum
-        frequency = Math.Min(frequency, sampleRate / 2); // Clamp to Nyquist frequency
+        ClampFrequency(ref frequency);
 
         // 1. Calculate intermediate variables
         float omega = (float)(2.0 * Math.PI * frequency / sampleRate);
@@ -102,10 +97,10 @@ public class BiquadFilter
         NormalizeAndStoreCoefficients(b0_raw, b1_raw, b2_raw, a0_raw, a1_raw, a2_raw);
     }
 
+    // configure the filter as a high-pass with the given cutoff frequency and Q factor
     public void UpdateHighPass(float frequency, float q)
     {
-        frequency = Math.Max(20, frequency); // Clamp to 20Hz minimum
-        frequency = Math.Min(frequency, sampleRate / 2); // Clamp to Nyquist frequency
+        ClampFrequency(ref frequency);
 
         // 1. Calculate intermediate variables
         // $\omega_0 = 2\pi \frac{f_c}{f_s}$
@@ -134,10 +129,10 @@ public class BiquadFilter
         NormalizeAndStoreCoefficients(b0_raw, b1_raw, b2_raw, a0_raw, a1_raw, a2_raw);
     }
 
+    // configure the filter as a peaking EQ with the given center frequency, Q factor, and gain in dB
     public void UpdatePeakingEQ(float frequency, float q, float gainDb)
     {
-        frequency = Math.Max(20, frequency); // Clamp to 20Hz minimum
-        frequency = Math.Min(frequency, sampleRate / 2); // Clamp to Nyquist frequency
+        ClampFrequency(ref frequency);
         
         // 1. Calculate intermediate variables
         // Intermediate variables:
@@ -168,15 +163,33 @@ public class BiquadFilter
         NormalizeAndStoreCoefficients(b0_raw, b1_raw, b2_raw, a0_raw, a1_raw, a2_raw);
     }
 
+    private void ClampFrequency(ref float frequency)
+    {
+        frequency = Math.Max(20, frequency); // Clamp to 20Hz minimum
+        frequency = Math.Min(frequency, sampleRate / 2); // Clamp to Nyquist frequency
+    }
+
     // This allows our Process() formula to be: y = b0*x + ... - a1*y1 - a2*y2
     private void NormalizeAndStoreCoefficients(float b0_raw, float b1_raw, float b2_raw, float a0_raw, float a1_raw, float a2_raw)
     {
-        targetChanged = true; // Set the flag to indicate that target coefficients have changed and need smoothing
-        this.target_b0 = b0_raw / a0_raw;
-        this.target_b1 = b1_raw / a0_raw;
-        this.target_b2 = b2_raw / a0_raw;
-        this.target_a1 = a1_raw / a0_raw;
-        this.target_a2 = a2_raw / a0_raw; 
+        target_b0 = b0_raw / a0_raw;
+        target_b1 = b1_raw / a0_raw;
+        target_b2 = b2_raw / a0_raw;
+        target_a1 = a1_raw / a0_raw;
+        target_a2 = a2_raw / a0_raw; 
+        
+        samplesRemaining = (int)samplesToTarget;
+        SetSteps();
+
+    }
+    // This method calculates the step values for each coefficient to smoothly transition from the current coefficients to the target coefficients over the specified number of samples (smoothing period). It is called when the target coefficients are updated and the targetChanged flag is set.
+    private void SetSteps()
+    {
+        step_b0 = (target_b0 - b0) / samplesToTarget;
+        step_b1 = (target_b1 - b1) / samplesToTarget;
+        step_b2 = (target_b2 - b2) / samplesToTarget;
+        step_a1 = (target_a1 - a1) / samplesToTarget;
+        step_a2 = (target_a2 - a2) / samplesToTarget;
     }
 
     public void Reset()
