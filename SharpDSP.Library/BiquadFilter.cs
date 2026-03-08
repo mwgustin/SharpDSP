@@ -45,6 +45,7 @@ public class BiquadFilter
             if(samplesRemaining > 0)
             {
                 samplesRemaining--;
+                
                 if(samplesRemaining == 0)
                 {
                     // Ensure we end up exactly at the target coefficients after the final step
@@ -188,9 +189,12 @@ public class BiquadFilter
         target_a1 = a1_raw / a0_raw;
         target_a2 = a2_raw / a0_raw; 
 
+        //calculate steps BEFORE settings samplesRemaining
+        // This ensures that the steps are calculated before we start applying them 
+        // and prevent any issues with the coefficients not updating correctly initially after a change
         SetSteps();
-        samplesRemaining = (int)samplesToTarget;
 
+        samplesRemaining = (int)samplesToTarget;
     }
     // This method calculates the step values for each coefficient to smoothly transition from the current coefficients to the target coefficients over the specified number of samples (smoothing period). It is called when the target coefficients are updated and the targetChanged flag is set.
     private void SetSteps()
