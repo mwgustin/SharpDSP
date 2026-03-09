@@ -3,11 +3,13 @@
 public class BiquadFilter
 {
     //coefficients 
-    float b0, b1, b2, a1, a2;
-    // target coefficients for smooth parameter changes
-    float target_b0, target_b1, target_b2, target_a1, target_a2; 
-    // step values for each coefficient to incrementally move from current to target over the smoothing period
-    float step_b0 = 0, step_b1 = 0, step_b2 = 0, step_a1 = 0, step_a2 = 0; 
+    // float b0, b1, b2, a1, a2;
+    // // target coefficients for smooth parameter changes
+    // float target_b0, target_b1, target_b2, target_a1, target_a2; 
+    // // step values for each coefficient to incrementally move from current to target over the smoothing period
+    // float step_b0 = 0, step_b1 = 0, step_b2 = 0, step_a1 = 0, step_a2 = 0; 
+
+    private SmoothedParameter b0, b1, b2, a1, a2;
     
     // Adjust this for faster/slower smoothing 
     const float smoothingTimeSeconds = 0.02f; 
@@ -28,11 +30,11 @@ public class BiquadFilter
         UpdateLowPass(1000, 0.707f); // default to a 1kHz low-pass filter
 
         // Init the current coefficients to the target coefficients to avoid a ramp-up on the first few samples
-        b0 = target_b0;
-        b1 = target_b1;
-        b2 = target_b2;
-        a1 = target_a1;
-        a2 = target_a2;
+        b0 = new SmoothedParameter(0.0f, smoothingTimeSeconds);
+        b1 = new SmoothedParameter(0.0f, smoothingTimeSeconds);
+        b2 = new SmoothedParameter(0.0f, smoothingTimeSeconds);
+        a1 = new SmoothedParameter(0.0f, smoothingTimeSeconds);
+        a2 = new SmoothedParameter(0.0f, smoothingTimeSeconds);
     }
 
     public void Process(float[] buffer)
@@ -40,35 +42,15 @@ public class BiquadFilter
         // MAIN HOT PATH: Process each sample in the buffer
         for(int i = 0; i < buffer.Length; i++)
         {
-            // if we have pending coefficient changes, incrementally update them towards the target values
-            if(samplesRemaining > 0)
-            {
-                samplesRemaining--;
-
-                if(samplesRemaining == 0)
-                {
-                    // Ensure we end up exactly at the target coefficients after the final step
-                    b0 = target_b0;
-                    b1 = target_b1;
-                    b2 = target_b2;
-                    a1 = target_a1;
-                    a2 = target_a2;
-                }
-                else
-                {
-                    // Incrementally update coefficients towards their targets
-                    b0 += step_b0;
-                    b1 += step_b1;
-                    b2 += step_b2;
-                    a1 += step_a1;
-                    a2 += step_a2;
-                }
-            }
+            float cur_b0 = b0.Next();
+            float cur_b1 = b1.Next();
+            float cur_b2 = b2.Next();
+            float cur_a1 = a1.Next();
+            float cur_a2 = a2.Next();
 
             //main biquad calculation: y[n] = b0*x[n] + b1*x[n-1] + b2*x[n-2] - a1*y[n-1] - a2*y[n-2]
             float x0 = buffer[i];
-            float y0 = (b0*x0) + (b1*x1) + (b2*x2) - (a1*y1) - (a2*y2);
-
+            float y0 = (cur_b0*x0) + (cur_b1*x1) + (cur_b2*x2) - (cur_a1*y1) - (cur_a2*y2);
             //transition state for next sample
             x2 = x1;
             x1 = x0;
@@ -182,29 +164,14 @@ public class BiquadFilter
     // This allows our Process() formula to be: y = b0*x + ... - a1*y1 - a2*y2
     private void NormalizeAndStoreCoefficients(float b0_raw, float b1_raw, float b2_raw, float a0_raw, float a1_raw, float a2_raw)
     {
-        target_b0 = b0_raw / a0_raw;
-        target_b1 = b1_raw / a0_raw;
-        target_b2 = b2_raw / a0_raw;
-        target_a1 = a1_raw / a0_raw;
-        target_a2 = a2_raw / a0_raw; 
 
-        //calculate steps BEFORE settings samplesRemaining
-        // This ensures that the steps are calculated before we start applying them 
-        // and prevent any issues with the coefficients not updating correctly initially after a change
-        SetSteps();
+        b0.SetTarget(b0_raw / a0_raw);
+        b1.SetTarget(b1_raw / a0_raw);
+        b2.SetTarget(b2_raw / a0_raw);
+        a1.SetTarget(a1_raw / a0_raw);
+        a2.SetTarget(a2_raw / a0_raw);
 
-        samplesRemaining = (int)samplesToTarget;
     }
-    // This method calculates the step values for each coefficient to smoothly transition from the current coefficients to the target coefficients over the specified number of samples (smoothing period). It is called when the target coefficients are updated and the targetChanged flag is set.
-    private void SetSteps()
-    {
-        step_b0 = (target_b0 - b0) / samplesToTarget;
-        step_b1 = (target_b1 - b1) / samplesToTarget;
-        step_b2 = (target_b2 - b2) / samplesToTarget;
-        step_a1 = (target_a1 - a1) / samplesToTarget;
-        step_a2 = (target_a2 - a2) / samplesToTarget;
-    }
-
     public void Reset()
     {
         x1 = x2 = y1 = y2 = 0;
