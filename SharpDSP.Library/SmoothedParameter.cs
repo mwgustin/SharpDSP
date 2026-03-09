@@ -1,50 +1,55 @@
+using System.Runtime.CompilerServices;
+
 namespace SharpDSP.Library;
 
-public class SmoothedParameter
+public record struct SmoothedParameter
 {
-    private float current;
-    private float target;
-    private float step;
+    private float _current;
+    private float _target;
+    private float _step;
 
-    private int samplesRemaining = 0;
+    private int _samplesRemaining = 0;
 
-    private readonly float samplesToTarget;
+    private readonly float _samplesToTarget;
 
-    public float Value => current;
+    public float Value => _current;
 
-    public bool IsSmoothing => samplesRemaining > 0;
+    public bool IsSmoothing => _samplesRemaining > 0;
 
     public SmoothedParameter(float initialValue, float smoothingTimeSeconds)
     {
-        current = target = initialValue;
-        samplesToTarget = smoothingTimeSeconds * Constants.SampleRate;
+        _current = _target = initialValue;
+        _samplesToTarget = smoothingTimeSeconds * Constants.SampleRate;
     }
-
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetTarget(float newTarget)
     {
-        target = newTarget;
-        step = (target - current) / samplesToTarget;
-        samplesRemaining = (int)samplesToTarget;
+        _target = newTarget;
+        _step = (_target - _current) / _samplesToTarget;
+        _samplesRemaining = (int)_samplesToTarget;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public float Next()
     {
-        if(samplesRemaining > 0)
+        if(_samplesRemaining > 0)
         {
-            current += step;
-            samplesRemaining--;
+            _current += _step;
+            _samplesRemaining--;
 
             // ensure we hit the exact target at the end of the transition
-            if(samplesRemaining == 0)
-                current = target; 
+            if(_samplesRemaining == 0)
+                _current = _target; 
         }
-        return current;
+        return _current;
     }
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SnapToTarget()
     {
-        current = target;
-        samplesRemaining = 0;
+        _current = _target;
+        _samplesRemaining = 0;
     }
 
 }
