@@ -12,7 +12,6 @@ public class ChorusEffect
     private SmoothedParameter mix;
 
     private const float smoothingTimeSeconds = 0.02f; // 20ms smoothing time for parameter changes
-    private const float samplesToTarget = smoothingTimeSeconds * Constants.SampleRate;
     private const float centerDelay = 0.02f * Constants.SampleRate; // 20ms center delay
 
     
